@@ -8,6 +8,7 @@ namespace IMGUIDebugDraw
 
         public static void Label(Vector2 position, string label, Color color, bool centered = true)
         {
+            StringStyle.normal.textColor = color;
             Label(position, label, centered);
         }
 
@@ -15,11 +16,19 @@ namespace IMGUIDebugDraw
         {
             GUIContent content = new GUIContent(label);
             Vector2 size = StringStyle.CalcSize(content);
-            GUI.Label(new Rect(centered ? (position - size / 2f) : position, size), content);
+            GUI.Label(new Rect(centered ? (position - size / 2f) : position, size), content, StringStyle);
+        }
+
+        public static void Label(Camera cam, Vector3 worldPos, string label, Color color)
+        {
+            if (!IsVisible(cam, worldPos)) return;
+            Vector2 screenPos = WorldToScreen(cam, worldPos);
+            Label(screenPos, label, color);
         }
 
         public static void Label(Camera cam, Vector3 worldPos, string label)
         {
+            if (!IsVisible(cam, worldPos)) return;
             Vector2 screenPos = WorldToScreen(cam, worldPos);
             Label(screenPos, label);
         }
