@@ -15,9 +15,15 @@ namespace IMGUIDebugDraw
 
         void OnGUI()
         {
+            Draw.Label(cam, transform.position, name);
+
             if (col is BoxCollider boxCol)
             {
                 Draw.BoxCollider(cam, boxCol, Color.green);
+            }
+            else if (col is SphereCollider sphereCol)
+            {
+                Draw.SphereCollider(cam, sphereCol, Color.blue);
             }
         }
     }

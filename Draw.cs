@@ -295,10 +295,39 @@ namespace IMGUIDebugDraw
             }
         }
 
+        public static void SphereCollider(Camera cam, SphereCollider sphereCollider, Color color, int segments = 24)
+        {
+            if (sphereCollider == null || cam == null) return;
+
+            Transform transform = sphereCollider.transform;
+            Vector3 center = transform.TransformPoint(sphereCollider.center);
+
+            Vector3 scale = transform.lossyScale;
+            float maxScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+            float radius = sphereCollider.radius * maxScale;
 
             float thickness = 1.5f;
 
+            DrawWorldCircle(cam, center, transform.right, transform.up, radius, color, thickness, segments);
+            DrawWorldCircle(cam, center, transform.up, transform.forward, radius, color, thickness, segments);
+            DrawWorldCircle(cam, center, transform.forward, transform.right, radius, color, thickness, segments);
+        }
 
+        private static void DrawWorldCircle(Camera cam, Vector3 center, Vector3 axis1, Vector3 axis2, float radius, Color color, float thickness, int segments)
+        {
+            if (segments <= 0) return;
+
+            Vector3 lastWorldPos = center + axis1 * radius;
+
+            for (int i = 1; i <= segments; i++)
+            {
+                float angle = (float)i / segments * 2f * Mathf.PI;
+                Vector3 currentWorldPos = center + (Mathf.Cos(angle) * axis1 + Mathf.Sin(angle) * axis2) * radius;
+
+                DrawEdge(cam, lastWorldPos, currentWorldPos, thickness, color);
+
+                lastWorldPos = currentWorldPos;
+            }
         }
     }
 }
