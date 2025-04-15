@@ -12,14 +12,16 @@ namespace IMGUIDebugDraw
         Camera cam;
         Collider col;
 
-        void Start()
+        void OnEnable()
         {
-            cam = Camera.main;
             col = GetComponent<Collider>();
         }
 
         void OnGUI()
         {
+            if (col == null || !col.enabled)
+                return;
+
             if (cam == null)
             {
                 cam = Camera.main;
