@@ -59,75 +59,95 @@ namespace IMGUIDebugDraw
 
         public static void Line(Vector2 lineStart, Vector2 lineEnd, float thickness, Color color)
         {
+            if (lineStart == lineEnd) return;
+
+            GUI.color = color;
+
             Vector2 vector = lineEnd - lineStart;
-            float num = 57.29578f * Mathf.Atan(vector.y / vector.x);
-            if (vector.x < 0f)
-            {
-                num += 180f;
-            }
+            float angle = Mathf.Atan2(vector.y, vector.x) * Mathf.Rad2Deg;
+
             if (thickness < 1f)
             {
                 thickness = 1f;
             }
-            int num2 = checked((int)Mathf.Ceil(thickness / 2f));
-            GUIUtility.RotateAroundPivot(num, lineStart);
-            GUI.DrawTexture(new Rect(lineStart.x, lineStart.y - (float)num2, vector.magnitude, thickness), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 1f, color, 0f, 0f);
-            GUIUtility.RotateAroundPivot(-num, lineStart);
+            float halfThickness = thickness / 2f;
+
+            Matrix4x4 matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(angle, lineStart);
+            GUI.DrawTexture(new Rect(lineStart.x, lineStart.y - halfThickness, vector.magnitude, thickness), Texture2D.whiteTexture, ScaleMode.StretchToFill);
+            GUI.matrix = matrix;
         }
 
-        public static void Circle(Vector2 center, float radius, Color color, float width, int segmentsPerQuarter)
+        public static void Circle(Vector2 center, float radius, Color color, float width, int segmentsPerQuarter = 10)
         {
-            float num = radius / 2f;
-            Vector2 vector = new Vector2(center.x, center.y - radius);
-            Vector2 endTangent = new Vector2(center.x - num, center.y - radius);
-            Vector2 startTangent = new Vector2(center.x + num, center.y - radius);
-            Vector2 vector2 = new Vector2(center.x + radius, center.y);
-            Vector2 endTangent2 = new Vector2(center.x + radius, center.y - num);
-            Vector2 startTangent2 = new Vector2(center.x + radius, center.y + num);
-            Vector2 vector3 = new Vector2(center.x, center.y + radius);
-            Vector2 startTangent3 = new Vector2(center.x - num, center.y + radius);
-            Vector2 endTangent3 = new Vector2(center.x + num, center.y + radius);
-            Vector2 vector4 = new Vector2(center.x - radius, center.y);
-            Vector2 startTangent4 = new Vector2(center.x - radius, center.y - num);
-            Vector2 endTangent4 = new Vector2(center.x - radius, center.y + num);
+            segmentsPerQuarter = Mathf.Max(1, segmentsPerQuarter);
 
-            Draw.BezierLine(vector, startTangent, vector2, endTangent2, color, width, segmentsPerQuarter);
-            Draw.BezierLine(vector2, startTangent2, vector3, endTangent3, color, width, segmentsPerQuarter);
-            Draw.BezierLine(vector3, startTangent3, vector4, endTangent4, color, width, segmentsPerQuarter);
-            Draw.BezierLine(vector4, startTangent4, vector, endTangent, color, width, segmentsPerQuarter);
+            Vector2 top = new Vector2(center.x, center.y - radius);
+            Vector2 right = new Vector2(center.x + radius, center.y);
+            Vector2 bottom = new Vector2(center.x, center.y + radius);
+            Vector2 left = new Vector2(center.x - radius, center.y);
+
+            float tangentLength = radius * 0.55228f;
+
+            Draw.BezierLine(top, top + Vector2.right * tangentLength, right, right + Vector2.down * tangentLength, color, width, segmentsPerQuarter);
+            Draw.BezierLine(right, right + Vector2.up * tangentLength, bottom, bottom + Vector2.left * tangentLength, color, width, segmentsPerQuarter);
+            Draw.BezierLine(bottom, bottom + Vector2.right * tangentLength, left, left + Vector2.down * tangentLength, color, width, segmentsPerQuarter);
+            Draw.BezierLine(left, left + Vector2.up * tangentLength, top, top + Vector2.left * tangentLength, color, width, segmentsPerQuarter);
         }
 
         public static void BezierLine(Vector2 start, Vector2 startTangent, Vector2 end, Vector2 endTangent, Color color, float width, int segments)
         {
-            Vector2 lineStart = Draw.Bezier(start, startTangent, end, endTangent, 0f);
-            checked
+            Vector2 lineStart = Draw.EvaluateCubicBezier(start, startTangent, end, endTangent, 0f);
+            for (int i = 1; i <= segments; i++)
             {
-                for (int i = 1; i < segments + 1; i++)
-                {
-                    Vector2 vector = Draw.Bezier(start, startTangent, end, endTangent, (float)i / (float)segments);
-                    Draw.Line(lineStart, vector, width, color);
-                    lineStart = vector;
-                }
+                float t = (float)i / segments;
+                Vector2 lineEnd = Draw.EvaluateCubicBezier(start, startTangent, end, endTangent, t);
+                Draw.Line(lineStart, lineEnd, width, color);
+                lineStart = lineEnd;
             }
         }
 
-        private static Vector2 Bezier(Vector2 s, Vector2 st, Vector2 e, Vector2 et, float t)
+        private static Vector2 EvaluateCubicBezier(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float t)
         {
-            float num = 1f - t;
-            return num * num * num * s + 3f * num * num * t * st + 3f * num * t * t * et + t * t * t * e;
+            float u = 1f - t;
+            float tt = t * t;
+            float uu = u * u;
+            float uuu = uu * u;
+            float ttt = tt * t;
+
+            Vector2 p = uuu * p0; // (1-t)^3 * p0
+            p += 3f * uu * t * p1; // 3 * (1-t)^2 * t * p1
+            p += 3f * u * tt * p2; // 3 * (1-t) * t^2 * p2
+            p += ttt * p3; // t^3 * p3
+
+            return p;
         }
 
         private static bool IsVisible(Camera camera, Vector3 worldPos)
         {
+            if (camera == null)
+            {
+                Debug.LogError("IMGUIDebugDraw: Camera is null!");
+                return false;
+            }
             Vector3 viewportPoint = camera.WorldToViewportPoint(worldPos);
-            return viewportPoint.z > 0; // If z is positive, the point is in front of the camera
+
+            return viewportPoint.z > camera.nearClipPlane &&
+                   viewportPoint.x >= 0 && viewportPoint.x <= 1 &&
+                   viewportPoint.y >= 0 && viewportPoint.y <= 1;
         }
 
         private static Vector2 WorldToScreen(Camera camera, Vector3 worldPos)
         {
+            if (camera == null)
+            {
+                Debug.LogError("IMGUIDebugDraw: Camera is null! Cannot convert WorldToScreen.");
+                return Vector2.zero;
+            }
             Vector3 screenPoint = camera.WorldToScreenPoint(worldPos);
-            screenPoint.y = (float)Screen.height - screenPoint.y;
-            return screenPoint;
+
+            screenPoint.y = Screen.height - screenPoint.y;
+            return new Vector2(screenPoint.x, screenPoint.y);
         }
 
         public static void Bounds(Camera cam, Bounds bounds, Color color)
@@ -135,69 +155,98 @@ namespace IMGUIDebugDraw
             Vector3 center = bounds.center;
             Vector3 extents = bounds.extents;
 
-            Vector3[] worldPoint = new Vector3[]
-            {
-                new Vector3(center.x + extents.x, center.y + extents.y, center.z + extents.z),
-                new Vector3(center.x + extents.x, center.y + extents.y, center.z - extents.z),
-                new Vector3(center.x + extents.x, center.y - extents.y, center.z - extents.z),
-                new Vector3(center.x + extents.x, center.y - extents.y, center.z + extents.z),
-                new Vector3(center.x - extents.x, center.y + extents.y, center.z + extents.z),
-                new Vector3(center.x - extents.x, center.y + extents.y, center.z - extents.z),
-                new Vector3(center.x - extents.x, center.y - extents.y, center.z - extents.z),
-                new Vector3(center.x - extents.x, center.y - extents.y, center.z + extents.z)
-            };
+            Vector3[] corners = new Vector3[8];
+            corners[0] = center + new Vector3(extents.x, extents.y, extents.z);
+            corners[1] = center + new Vector3(extents.x, extents.y, -extents.z);
+            corners[2] = center + new Vector3(extents.x, -extents.y, -extents.z);
+            corners[3] = center + new Vector3(extents.x, -extents.y, extents.z);
+            corners[4] = center + new Vector3(-extents.x, extents.y, extents.z);
+            corners[5] = center + new Vector3(-extents.x, extents.y, -extents.z);
+            corners[6] = center + new Vector3(-extents.x, -extents.y, -extents.z);
+            corners[7] = center + new Vector3(-extents.x, -extents.y, extents.z);
 
             float thickness = 1.5f;
 
-            if (IsVisible(cam, worldPoint[0]) && IsVisible(cam, worldPoint[1])) Draw.Line(WorldToScreen(cam, worldPoint[0]), WorldToScreen(cam, worldPoint[1]), thickness, color);
-            if (IsVisible(cam, worldPoint[1]) && IsVisible(cam, worldPoint[2])) Draw.Line(WorldToScreen(cam, worldPoint[1]), WorldToScreen(cam, worldPoint[2]), thickness, color);
-            if (IsVisible(cam, worldPoint[2]) && IsVisible(cam, worldPoint[3])) Draw.Line(WorldToScreen(cam, worldPoint[2]), WorldToScreen(cam, worldPoint[3]), thickness, color);
-            if (IsVisible(cam, worldPoint[3]) && IsVisible(cam, worldPoint[0])) Draw.Line(WorldToScreen(cam, worldPoint[3]), WorldToScreen(cam, worldPoint[0]), thickness, color);
-            if (IsVisible(cam, worldPoint[4]) && IsVisible(cam, worldPoint[5])) Draw.Line(WorldToScreen(cam, worldPoint[4]), WorldToScreen(cam, worldPoint[5]), thickness, color);
-            if (IsVisible(cam, worldPoint[5]) && IsVisible(cam, worldPoint[6])) Draw.Line(WorldToScreen(cam, worldPoint[5]), WorldToScreen(cam, worldPoint[6]), thickness, color);
-            if (IsVisible(cam, worldPoint[6]) && IsVisible(cam, worldPoint[7])) Draw.Line(WorldToScreen(cam, worldPoint[6]), WorldToScreen(cam, worldPoint[7]), thickness, color);
-            if (IsVisible(cam, worldPoint[7]) && IsVisible(cam, worldPoint[4])) Draw.Line(WorldToScreen(cam, worldPoint[7]), WorldToScreen(cam, worldPoint[4]), thickness, color);
-            if (IsVisible(cam, worldPoint[0]) && IsVisible(cam, worldPoint[4])) Draw.Line(WorldToScreen(cam, worldPoint[0]), WorldToScreen(cam, worldPoint[4]), thickness, color);
-            if (IsVisible(cam, worldPoint[1]) && IsVisible(cam, worldPoint[5])) Draw.Line(WorldToScreen(cam, worldPoint[1]), WorldToScreen(cam, worldPoint[5]), thickness, color);
-            if (IsVisible(cam, worldPoint[2]) && IsVisible(cam, worldPoint[6])) Draw.Line(WorldToScreen(cam, worldPoint[2]), WorldToScreen(cam, worldPoint[6]), thickness, color);
-            if (IsVisible(cam, worldPoint[3]) && IsVisible(cam, worldPoint[7])) Draw.Line(WorldToScreen(cam, worldPoint[3]), WorldToScreen(cam, worldPoint[7]), thickness, color);
+            DrawEdge(cam, corners[0], corners[1], thickness, color);
+            DrawEdge(cam, corners[1], corners[2], thickness, color);
+            DrawEdge(cam, corners[2], corners[3], thickness, color);
+            DrawEdge(cam, corners[3], corners[0], thickness, color);
+
+            DrawEdge(cam, corners[4], corners[5], thickness, color);
+            DrawEdge(cam, corners[5], corners[6], thickness, color);
+            DrawEdge(cam, corners[6], corners[7], thickness, color);
+            DrawEdge(cam, corners[7], corners[4], thickness, color);
+
+            DrawEdge(cam, corners[0], corners[4], thickness, color);
+            DrawEdge(cam, corners[1], corners[5], thickness, color);
+            DrawEdge(cam, corners[2], corners[6], thickness, color);
+            DrawEdge(cam, corners[3], corners[7], thickness, color);
         }
+
 
         public static void BoxCollider(Camera cam, BoxCollider boxCollider, Color color)
         {
-            Transform transform = boxCollider.transform;
-            Vector3 center = transform.TransformPoint(boxCollider.center); // Collider's center is local
-            Vector3 halfExtents = boxCollider.size / 2f;
-            halfExtents.x *= boxCollider.transform.localScale.x;
-            halfExtents.y *= boxCollider.transform.localScale.y;
-            halfExtents.z *= boxCollider.transform.localScale.z;
+            if (boxCollider == null) return;
 
-            Vector3[] worldPoint = new Vector3[]
-            {
-            center + transform.rotation * new Vector3(halfExtents.x, halfExtents.y, halfExtents.z),
-            center + transform.rotation * new Vector3(halfExtents.x, halfExtents.y, -halfExtents.z),
-            center + transform.rotation * new Vector3(halfExtents.x, -halfExtents.y, -halfExtents.z),
-            center + transform.rotation * new Vector3(halfExtents.x, -halfExtents.y, halfExtents.z),
-            center + transform.rotation * new Vector3(-halfExtents.x, halfExtents.y, halfExtents.z),
-            center + transform.rotation * new Vector3(-halfExtents.x, halfExtents.y, -halfExtents.z),
-            center + transform.rotation * new Vector3(-halfExtents.x, -halfExtents.y, -halfExtents.z),
-            center + transform.rotation * new Vector3(-halfExtents.x, -halfExtents.y, halfExtents.z)
-            };
+            Transform transform = boxCollider.transform;
+            Vector3 center = boxCollider.center;
+            Vector3 size = boxCollider.size;
+
+            Vector3 halfExtents = size / 2f;
+            Vector3 scale = transform.lossyScale;
+            halfExtents.x *= scale.x;
+            halfExtents.y *= scale.y;
+            halfExtents.z *= scale.z;
+
+            Vector3 worldCenter = transform.TransformPoint(center);
+            Quaternion worldRotation = transform.rotation;
+
+            Vector3[] corners = new Vector3[8];
+            corners[0] = worldCenter + worldRotation * new Vector3(halfExtents.x, halfExtents.y, halfExtents.z);
+            corners[1] = worldCenter + worldRotation * new Vector3(halfExtents.x, halfExtents.y, -halfExtents.z);
+            corners[2] = worldCenter + worldRotation * new Vector3(halfExtents.x, -halfExtents.y, -halfExtents.z);
+            corners[3] = worldCenter + worldRotation * new Vector3(halfExtents.x, -halfExtents.y, halfExtents.z);
+            corners[4] = worldCenter + worldRotation * new Vector3(-halfExtents.x, halfExtents.y, halfExtents.z);
+            corners[5] = worldCenter + worldRotation * new Vector3(-halfExtents.x, halfExtents.y, -halfExtents.z);
+            corners[6] = worldCenter + worldRotation * new Vector3(-halfExtents.x, -halfExtents.y, -halfExtents.z);
+            corners[7] = worldCenter + worldRotation * new Vector3(-halfExtents.x, -halfExtents.y, halfExtents.z);
 
             float thickness = 1.5f;
 
-            if (IsVisible(cam, worldPoint[0]) && IsVisible(cam, worldPoint[1])) Draw.Line(WorldToScreen(cam, worldPoint[0]), WorldToScreen(cam, worldPoint[1]), thickness, color);
-            if (IsVisible(cam, worldPoint[1]) && IsVisible(cam, worldPoint[2])) Draw.Line(WorldToScreen(cam, worldPoint[1]), WorldToScreen(cam, worldPoint[2]), thickness, color);
-            if (IsVisible(cam, worldPoint[2]) && IsVisible(cam, worldPoint[3])) Draw.Line(WorldToScreen(cam, worldPoint[2]), WorldToScreen(cam, worldPoint[3]), thickness, color);
-            if (IsVisible(cam, worldPoint[3]) && IsVisible(cam, worldPoint[0])) Draw.Line(WorldToScreen(cam, worldPoint[3]), WorldToScreen(cam, worldPoint[0]), thickness, color);
-            if (IsVisible(cam, worldPoint[4]) && IsVisible(cam, worldPoint[5])) Draw.Line(WorldToScreen(cam, worldPoint[4]), WorldToScreen(cam, worldPoint[5]), thickness, color);
-            if (IsVisible(cam, worldPoint[5]) && IsVisible(cam, worldPoint[6])) Draw.Line(WorldToScreen(cam, worldPoint[5]), WorldToScreen(cam, worldPoint[6]), thickness, color);
-            if (IsVisible(cam, worldPoint[6]) && IsVisible(cam, worldPoint[7])) Draw.Line(WorldToScreen(cam, worldPoint[6]), WorldToScreen(cam, worldPoint[7]), thickness, color);
-            if (IsVisible(cam, worldPoint[7]) && IsVisible(cam, worldPoint[4])) Draw.Line(WorldToScreen(cam, worldPoint[7]), WorldToScreen(cam, worldPoint[4]), thickness, color);
-            if (IsVisible(cam, worldPoint[0]) && IsVisible(cam, worldPoint[4])) Draw.Line(WorldToScreen(cam, worldPoint[0]), WorldToScreen(cam, worldPoint[4]), thickness, color);
-            if (IsVisible(cam, worldPoint[1]) && IsVisible(cam, worldPoint[5])) Draw.Line(WorldToScreen(cam, worldPoint[1]), WorldToScreen(cam, worldPoint[5]), thickness, color);
-            if (IsVisible(cam, worldPoint[2]) && IsVisible(cam, worldPoint[6])) Draw.Line(WorldToScreen(cam, worldPoint[2]), WorldToScreen(cam, worldPoint[6]), thickness, color);
-            if (IsVisible(cam, worldPoint[3]) && IsVisible(cam, worldPoint[7])) Draw.Line(WorldToScreen(cam, worldPoint[3]), WorldToScreen(cam, worldPoint[7]), thickness, color);
+            DrawEdge(cam, corners[0], corners[1], thickness, color);
+            DrawEdge(cam, corners[1], corners[2], thickness, color);
+            DrawEdge(cam, corners[2], corners[3], thickness, color);
+            DrawEdge(cam, corners[3], corners[0], thickness, color);
+
+            DrawEdge(cam, corners[4], corners[5], thickness, color);
+            DrawEdge(cam, corners[5], corners[6], thickness, color);
+            DrawEdge(cam, corners[6], corners[7], thickness, color);
+            DrawEdge(cam, corners[7], corners[4], thickness, color);
+
+            DrawEdge(cam, corners[0], corners[4], thickness, color);
+            DrawEdge(cam, corners[1], corners[5], thickness, color);
+            DrawEdge(cam, corners[2], corners[6], thickness, color);
+            DrawEdge(cam, corners[3], corners[7], thickness, color);
+        }
+
+        private static void DrawEdge(Camera cam, Vector3 worldStart, Vector3 worldEnd, float thickness, Color color)
+        {
+            if (cam == null) return;
+            Vector3 viewStart = cam.WorldToViewportPoint(worldStart);
+            Vector3 viewEnd = cam.WorldToViewportPoint(worldEnd);
+
+            if (viewStart.z > cam.nearClipPlane - 0.01f && viewEnd.z > cam.nearClipPlane - 0.01f)
+            {
+                bool startIn = viewStart.x >= -0.1f && viewStart.x <= 1.1f && viewStart.y >= -0.1f && viewStart.y <= 1.1f;
+                bool endIn = viewEnd.x >= -0.1f && viewEnd.x <= 1.1f && viewEnd.y >= -0.1f && viewEnd.y <= 1.1f;
+
+                if (startIn || endIn)
+                {
+                    Vector2 screenStart = WorldToScreen(cam, worldStart);
+                    Vector2 screenEnd = WorldToScreen(cam, worldEnd);
+                    Line(screenStart, screenEnd, thickness, color);
+                }
+            }
         }
 
         public static void PlainAxes(Camera camera, Vector3 worldPos, Color color)
@@ -211,25 +260,45 @@ namespace IMGUIDebugDraw
             //      |
 
             float size = 0.2f;
+            float thickness = 1.5f;
+            Vector2 letterOffset = new Vector2(0, -10);
+            float labelVisibilityThreshold = 0.1f;
 
-            Vector3 xa = worldPos - new Vector3(size, 0f, 0f);
-            Vector3 xb = worldPos + new Vector3(size, 0f, 0f);
-            Vector3 ya = worldPos - new Vector3(0f, size, 0f);
-            Vector3 yb = worldPos + new Vector3(0f, size, 0f);
-            Vector3 za = worldPos - new Vector3(0f, 0f, size);
-            Vector3 zb = worldPos + new Vector3(0f, 0f, size);
+            Vector3 xEnd = worldPos + Vector3.right * size;
+            Vector3 yEnd = worldPos + Vector3.up * size;
+            Vector3 zEnd = worldPos + Vector3.forward * size;
+
+            DrawEdge(camera, worldPos - Vector3.right * size, xEnd, thickness, color);
+            DrawEdge(camera, worldPos - Vector3.up * size, yEnd, thickness, color);
+            DrawEdge(camera, worldPos - Vector3.forward * size, zEnd, thickness, color);
+
+            // Draw Labels only if endpoint is visible and not too close to screen edge
+            if (camera != null)
+            {
+                Vector3 viewX = camera.WorldToViewportPoint(xEnd);
+                if (viewX.z > camera.nearClipPlane && viewX.x > labelVisibilityThreshold && viewX.x < 1 - labelVisibilityThreshold && viewX.y > labelVisibilityThreshold && viewX.y < 1 - labelVisibilityThreshold)
+                {
+                    Label(WorldToScreen(camera, xEnd) + letterOffset, "x", color);
+                }
+
+                Vector3 viewY = camera.WorldToViewportPoint(yEnd);
+                if (viewY.z > camera.nearClipPlane && viewY.x > labelVisibilityThreshold && viewY.x < 1 - labelVisibilityThreshold && viewY.y > labelVisibilityThreshold && viewY.y < 1 - labelVisibilityThreshold)
+                {
+                    Label(WorldToScreen(camera, yEnd) + letterOffset, "y", color);
+                }
+
+                Vector3 viewZ = camera.WorldToViewportPoint(zEnd);
+                if (viewZ.z > camera.nearClipPlane && viewZ.x > labelVisibilityThreshold && viewZ.x < 1 - labelVisibilityThreshold && viewZ.y > labelVisibilityThreshold && viewZ.y < 1 - labelVisibilityThreshold)
+                {
+                    Label(WorldToScreen(camera, zEnd) + letterOffset, "z", color);
+                }
+            }
+        }
+
 
             float thickness = 1.5f;
 
-            // Check if the points are in front of the camera before drawing
-            if (IsVisible(camera, xa) && IsVisible(camera, xb)) Draw.Line(WorldToScreen(camera, xa), WorldToScreen(camera, xb), thickness, color);
-            if (IsVisible(camera, ya) && IsVisible(camera, yb)) Draw.Line(WorldToScreen(camera, ya), WorldToScreen(camera, yb), thickness, color);
-            if (IsVisible(camera, za) && IsVisible(camera, zb)) Draw.Line(WorldToScreen(camera, za), WorldToScreen(camera, zb), thickness, color);
 
-            Vector2 letterOffset = new Vector2(0, 10);
-            if (IsVisible(camera, xb)) Draw.Label(WorldToScreen(camera, xb) + letterOffset, "x", color);
-            if (IsVisible(camera, yb)) Draw.Label(WorldToScreen(camera, yb) + letterOffset, "y", color);
-            if (IsVisible(camera, zb)) Draw.Label(WorldToScreen(camera, zb) + letterOffset, "z", color);
         }
     }
 }
