@@ -2,8 +2,11 @@
 
 namespace IMGUIDebugDraw
 {
+    [RequireComponent(typeof(Collider))]
     public class IMGUIColliderVisualizer : MonoBehaviour
     {
+        public Color color = Color.green;
+
         Camera cam;
         Collider col;
 
@@ -19,15 +22,15 @@ namespace IMGUIDebugDraw
 
             if (col is BoxCollider boxCol)
             {
-                Draw.BoxCollider(cam, boxCol, Color.green);
+                Draw.BoxCollider(cam, boxCol, color);
             }
             else if (col is SphereCollider sphereCol)
             {
-                Draw.SphereCollider(cam, sphereCol, Color.blue);
+                Draw.SphereCollider(cam, sphereCol, color);
             }
             else if (col is CapsuleCollider capsuleCol)
             {
-                Draw.CapsuleCollider(cam, capsuleCol, Color.blue);
+                Draw.CapsuleCollider(cam, capsuleCol, color);
             }
         }
     }
