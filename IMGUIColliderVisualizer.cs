@@ -7,6 +7,8 @@ namespace IMGUIDebugDraw
     {
         public Color color = Color.green;
 
+        public float cullingDistance = 10f;
+
         Camera cam;
         Collider col;
 
@@ -24,6 +26,9 @@ namespace IMGUIDebugDraw
                 if (cam == null)
                     return;
             }
+
+            if (Vector3.Distance(transform.position, cam.transform.position) > cullingDistance)
+                return;
 
             Draw.Label(cam, transform.position, name);
 
