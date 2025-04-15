@@ -18,6 +18,13 @@ namespace IMGUIDebugDraw
 
         void OnGUI()
         {
+            if (cam == null)
+            {
+                cam = Camera.main;
+                if (cam == null)
+                    return;
+            }
+
             Draw.Label(cam, transform.position, name);
 
             if (col is BoxCollider boxCol)
