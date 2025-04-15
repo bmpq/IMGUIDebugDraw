@@ -49,11 +49,12 @@ namespace IMGUIDebugDraw
 
         public static void Box(float x, float y, float w, float h, float thickness, Color color)
         {
+            GUI.color = color;
             Texture2D whiteTexture = Texture2D.whiteTexture;
             GUI.DrawTexture(new Rect(x, y, w + thickness, thickness), whiteTexture);
-            GUI.DrawTexture(new Rect(x, y, thickness, h + thickness), whiteTexture);
-            GUI.DrawTexture(new Rect(x + w, y, thickness, h + thickness), whiteTexture);
             GUI.DrawTexture(new Rect(x, y + h, w + thickness, thickness), whiteTexture);
+            GUI.DrawTexture(new Rect(x, y + thickness, thickness, h - thickness), whiteTexture);
+            GUI.DrawTexture(new Rect(x + w, y + thickness, thickness, h - thickness), whiteTexture);
         }
 
         public static void Line(Vector2 lineStart, Vector2 lineEnd, float thickness, Color color)
