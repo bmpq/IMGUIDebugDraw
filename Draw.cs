@@ -33,11 +33,18 @@ namespace IMGUIDebugDraw
             Label(screenPos, label);
         }
 
-        public static void Crosshair(Vector2 position, float size, Color color, float thickness)
+        public static void Crosshair(Vector2 position, float size, Color color, float thickness = 1f)
         {
+            GUI.color = color;
             Texture2D whiteTexture = Texture2D.whiteTexture;
-            GUI.DrawTexture(new Rect(position.x - size, position.y, size * 2f + thickness, thickness), whiteTexture);
-            GUI.DrawTexture(new Rect(position.x, position.y - size, thickness, size * 2f + thickness), whiteTexture);
+
+            GUI.DrawTexture(new Rect(position.x - size / 2f, position.y - thickness / 2f, size, thickness), whiteTexture);
+            GUI.DrawTexture(new Rect(position.x - thickness / 2f, position.y - size / 2f, thickness, size), whiteTexture);
+        }
+
+        public static void Crosshair(float size, Color color, float thickness = 1f)
+        {
+            Crosshair(new Vector2(Screen.width / 2f, Screen.height / 2f), size, color, thickness);
         }
 
         public static void Box(float x, float y, float w, float h, float thickness, Color color)
