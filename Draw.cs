@@ -313,6 +313,101 @@ namespace IMGUIDebugDraw
             DrawWorldCircle(cam, center, transform.forward, transform.right, radius, color, thickness, segments);
         }
 
+        public static void CapsuleCollider(Camera cam, CapsuleCollider capsuleCollider, Color color, int segments = 24)
+        {
+            if (capsuleCollider == null || cam == null) return;
+            if (segments < 4) segments = 4; // Need at least 4 for minimal shape
+
+            Transform transform = capsuleCollider.transform;
+            Vector3 localCenter = capsuleCollider.center;
+            float localRadius = capsuleCollider.radius;
+            float localHeight = capsuleCollider.height;
+            int direction = capsuleCollider.direction; // 0: X, 1: Y, 2: Z
+
+            Vector3 worldCenter = transform.TransformPoint(localCenter);
+            Vector3 lossyScale = transform.lossyScale;
+            Quaternion worldRotation = transform.rotation;
+
+            // Determine world axes based on direction
+            Vector3 worldUpAxis, worldRightAxis, worldForwardAxis;
+            float scaleAlongAxis, radiusScaleX, radiusScaleZ;
+
+            switch (direction)
+            {
+                case 0: // X-axis
+                    worldUpAxis = worldRotation * Vector3.right;
+                    worldRightAxis = worldRotation * Vector3.up;     // Perpendicular 1
+                    worldForwardAxis = worldRotation * Vector3.forward; // Perpendicular 2
+                    scaleAlongAxis = Mathf.Abs(lossyScale.x);
+                    radiusScaleX = Mathf.Abs(lossyScale.y);
+                    radiusScaleZ = Mathf.Abs(lossyScale.z);
+                    break;
+                case 2: // Z-axis
+                    worldUpAxis = worldRotation * Vector3.forward;
+                    worldRightAxis = worldRotation * Vector3.right;   // Perpendicular 1
+                    worldForwardAxis = worldRotation * Vector3.up;      // Perpendicular 2
+                    scaleAlongAxis = Mathf.Abs(lossyScale.z);
+                    radiusScaleX = Mathf.Abs(lossyScale.x);
+                    radiusScaleZ = Mathf.Abs(lossyScale.y);
+                    break;
+                default: // 1: Y-axis (Default)
+                    worldUpAxis = worldRotation * Vector3.up;
+                    worldRightAxis = worldRotation * Vector3.right;   // Perpendicular 1
+                    worldForwardAxis = worldRotation * Vector3.forward; // Perpendicular 2
+                    scaleAlongAxis = Mathf.Abs(lossyScale.y);
+                    radiusScaleX = Mathf.Abs(lossyScale.x);
+                    radiusScaleZ = Mathf.Abs(lossyScale.z);
+                    break;
+            }
+
+            // Calculate scaled radius and height
+            float radius = localRadius * Mathf.Max(radiusScaleX, radiusScaleZ); // Use max perpendicular scale for radius
+            float height = localHeight * scaleAlongAxis;
+
+            // Clamp height to be at least 2 * radius (a sphere)
+            height = Mathf.Max(height, radius * 2f);
+
+            float cylinderHeight = height - 2f * radius; // Height of the cylinder part
+            float halfCylinderHeight = cylinderHeight * 0.5f;
+
+            // Calculate centers of the two hemispheres
+            Vector3 topSphereCenter = worldCenter + worldUpAxis * halfCylinderHeight;
+            Vector3 bottomSphereCenter = worldCenter - worldUpAxis * halfCylinderHeight;
+
+            float thickness = 1.5f;
+
+            // Draw Hemispheres (Top and Bottom Caps)
+            // Draw equator circles
+            DrawWorldCircle(cam, topSphereCenter, worldRightAxis, worldForwardAxis, radius, color, thickness, segments);
+            DrawWorldCircle(cam, bottomSphereCenter, worldRightAxis, worldForwardAxis, radius, color, thickness, segments);
+
+            // Draw arcs for the caps (half circles along the main axis)
+            int arcSegments = segments / 2; // Half the segments for a half circle
+            DrawWorldArc(cam, topSphereCenter, worldRightAxis, worldUpAxis, radius, 0f, Mathf.PI, color, thickness, arcSegments); // Top Arc 1 (Right/Up plane)
+            DrawWorldArc(cam, topSphereCenter, worldForwardAxis, worldUpAxis, radius, 0f, Mathf.PI, color, thickness, arcSegments); // Top Arc 2 (Forward/Up plane)
+            DrawWorldArc(cam, bottomSphereCenter, worldRightAxis, -worldUpAxis, radius, 0f, Mathf.PI, color, thickness, arcSegments); // Bottom Arc 1 (Right/Down plane)
+            DrawWorldArc(cam, bottomSphereCenter, worldForwardAxis, -worldUpAxis, radius, 0f, Mathf.PI, color, thickness, arcSegments); // Bottom Arc 2 (Forward/Down plane)
+
+            // Draw Cylinder Sides (Connecting Lines)
+            if (cylinderHeight > 0.001f) // Only draw if there's a cylindrical part
+            {
+                Vector3 topPointR = topSphereCenter + worldRightAxis * radius;
+                Vector3 topPointL = topSphereCenter - worldRightAxis * radius;
+                Vector3 topPointF = topSphereCenter + worldForwardAxis * radius;
+                Vector3 topPointB = topSphereCenter - worldForwardAxis * radius;
+
+                Vector3 bottomPointR = bottomSphereCenter + worldRightAxis * radius;
+                Vector3 bottomPointL = bottomSphereCenter - worldRightAxis * radius;
+                Vector3 bottomPointF = bottomSphereCenter + worldForwardAxis * radius;
+                Vector3 bottomPointB = bottomSphereCenter - worldForwardAxis * radius;
+
+                DrawEdge(cam, topPointR, bottomPointR, thickness, color);
+                DrawEdge(cam, topPointL, bottomPointL, thickness, color);
+                DrawEdge(cam, topPointF, bottomPointF, thickness, color);
+                DrawEdge(cam, topPointB, bottomPointB, thickness, color);
+            }
+        }
+
         private static void DrawWorldCircle(Camera cam, Vector3 center, Vector3 axis1, Vector3 axis2, float radius, Color color, float thickness, int segments)
         {
             if (segments <= 0) return;
@@ -326,6 +421,26 @@ namespace IMGUIDebugDraw
 
                 DrawEdge(cam, lastWorldPos, currentWorldPos, thickness, color);
 
+                lastWorldPos = currentWorldPos;
+            }
+        }
+
+        private static void DrawWorldArc(Camera cam, Vector3 center, Vector3 axis1, Vector3 axis2, float radius, float startAngle, float endAngle, Color color, float thickness, int segments)
+        {
+            if (segments <= 0) return;
+            if (radius <= 0) return;
+            float angleRange = endAngle - startAngle;
+            if (Mathf.Approximately(angleRange, 0f)) return;
+
+
+            Vector3 lastWorldPos = center + (Mathf.Cos(startAngle) * axis1 + Mathf.Sin(startAngle) * axis2) * radius;
+            float angleStep = angleRange / segments;
+
+            for (int i = 1; i <= segments; i++)
+            {
+                float angle = startAngle + i * angleStep;
+                Vector3 currentWorldPos = center + (Mathf.Cos(angle) * axis1 + Mathf.Sin(angle) * axis2) * radius;
+                DrawEdge(cam, lastWorldPos, currentWorldPos, thickness, color);
                 lastWorldPos = currentWorldPos;
             }
         }

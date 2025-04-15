@@ -25,6 +25,10 @@ namespace IMGUIDebugDraw
             {
                 Draw.SphereCollider(cam, sphereCol, Color.blue);
             }
+            else if (col is CapsuleCollider capsuleCol)
+            {
+                Draw.CapsuleCollider(cam, capsuleCol, Color.blue);
+            }
         }
     }
 }
