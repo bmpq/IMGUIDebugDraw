@@ -408,6 +408,49 @@ namespace IMGUIDebugDraw
             }
         }
 
+        public static void Mesh(Camera cam, Transform transform, Mesh mesh, Color color)
+        {
+            if (mesh == null || !mesh.isReadable || transform == null || cam == null) 
+                return;
+
+            Vector3[] vertices = mesh.vertices;
+            int[] triangles = mesh.triangles;
+
+            if (vertices == null || triangles == null || vertices.Length == 0 || triangles.Length == 0)
+            {
+                return;
+            }
+
+            float thickness = 1.0f;
+
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                if (i + 2 >= triangles.Length) 
+                    break;
+
+                int index1 = triangles[i];
+                int index2 = triangles[i + 1];
+                int index3 = triangles[i + 2];
+
+                if (index1 >= vertices.Length || index2 >= vertices.Length || index3 >= vertices.Length)
+                {
+                    continue;
+                }
+
+                Vector3 localP1 = vertices[index1];
+                Vector3 localP2 = vertices[index2];
+                Vector3 localP3 = vertices[index3];
+
+                Vector3 worldP1 = transform.TransformPoint(localP1);
+                Vector3 worldP2 = transform.TransformPoint(localP2);
+                Vector3 worldP3 = transform.TransformPoint(localP3);
+
+                DrawEdge(cam, worldP1, worldP2, thickness, color);
+                DrawEdge(cam, worldP2, worldP3, thickness, color);
+                DrawEdge(cam, worldP3, worldP1, thickness, color);
+            }
+        }
+
         private static void DrawWorldCircle(Camera cam, Vector3 center, Vector3 axis1, Vector3 axis2, float radius, Color color, float thickness, int segments)
         {
             if (segments <= 0) return;
