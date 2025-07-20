@@ -229,7 +229,7 @@ namespace IMGUIDebugDraw
             DrawEdge(cam, corners[3], corners[7], thickness, color);
         }
 
-        private static void DrawEdge(Camera cam, Vector3 worldStart, Vector3 worldEnd, float thickness, Color color)
+        public static void DrawEdge(Camera cam, Vector3 worldStart, Vector3 worldEnd, float thickness, Color color)
         {
             if (cam == null) return;
             Vector3 viewStart = cam.WorldToViewportPoint(worldStart);
@@ -468,7 +468,7 @@ namespace IMGUIDebugDraw
             }
         }
 
-        private static void DrawWorldArc(Camera cam, Vector3 center, Vector3 axis1, Vector3 axis2, float radius, float startAngle, float endAngle, Color color, float thickness, int segments)
+        public static void DrawWorldArc(Camera cam, Vector3 center, Vector3 axis1, Vector3 axis2, float radius, float startAngle, float endAngle, Color color, float thickness, int segments)
         {
             if (segments <= 0) return;
             if (radius <= 0) return;
